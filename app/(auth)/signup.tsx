@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { Text, TextInput, Button } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Controller, useForm } from 'react-hook-form';
-import {
-  AlertNotificationRoot,
-  Toast,
-  ALERT_TYPE,
-} from 'react-native-alert-notification';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { AlertNotificationRoot, Toast } from 'react-native-alert-notification';
 
 interface SignupForm {
   name: string;
@@ -44,19 +41,18 @@ export default function SignupScreen() {
       await signUp(data.name, data.email, data.password);
       
       Toast.show({
-        type: ALERT_TYPE.SUCCESS,
+        type: 'success',
         title: 'Success',
-        textBody: 'Account created successfully!',
+        textBody: 'Account created successfully! Please verify your email.',
       });
 
-      // Optionally navigate or reset form after success
-      // router.push('/somepage');
+      router.replace('/(auth)/login');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'An error occurred during sign up';
       setError(message);
 
       Toast.show({
-        type: ALERT_TYPE.DANGER,
+        type: 'danger',
         title: 'Error',
         textBody: message,
       });
@@ -69,56 +65,50 @@ export default function SignupScreen() {
     try {
       setIsLoading(true);
       setError(null);
-
       await signInWithGoogle();
-
-      Toast.show({
-        type: ALERT_TYPE.SUCCESS,
-        title: 'Success',
-        textBody: 'Signed up with Google successfully!',
-      });
-
     } catch (err) {
-      const message = 'Google sign up failed. Please try again.';
-      setError(message);
-
-      Toast.show({
-        type: ALERT_TYPE.DANGER,
-        title: 'Error',
-        textBody: message,
-      });
+      setError('Google sign up failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const goToLogin = () => {
-    router.push('/(auth)/login');
+    router.replace('/(auth)/login');
   };
 
   return (
     <AlertNotificationRoot>
       <ScrollView 
-        contentContainerStyle={[
-          styles.container, 
-          { backgroundColor: theme.colors.background }
-        ]}
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+        contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>Create Account</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.placeholder }]}>
-            Sign up to get started
+        <Animated.View 
+          entering={FadeInDown.duration(1000)}
+          style={styles.header}
+        >
+          <Text style={[styles.title, { color: theme.colors.primary }]}>Create Account</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.secondary }]}>
+            Join our community today
           </Text>
-        </View>
+        </Animated.View>
 
         {error && (
-          <Text style={[styles.errorText, { color: theme.colors.error }]}>
-            {error}
-          </Text>
+          <Animated.View 
+            entering={FadeInUp.duration(500)}
+            style={styles.errorContainer}
+          >
+            <Text style={[styles.errorText, { color: theme.colors.error }]}>
+              {error}
+            </Text>
+          </Animated.View>
         )}
 
-        <View style={styles.form}>
+        <Animated.View 
+          entering={FadeInUp.delay(300).duration(1000)}
+          style={styles.form}
+        >
           <Controller
             control={control}
             rules={{
@@ -137,13 +127,13 @@ export default function SignupScreen() {
                 mode="outlined"
                 style={styles.input}
                 error={!!errors.name}
-                activeOutlineColor={theme.colors.primary}
+                left={<TextInput.Icon icon="account" />}
               />
             )}
             name="name"
           />
           {errors.name && (
-            <Text style={[styles.errorText, { color: theme.colors.error }]}>
+            <Text style={[styles.fieldError, { color: theme.colors.error }]}>
               {errors.name.message}
             </Text>
           )}
@@ -168,13 +158,13 @@ export default function SignupScreen() {
                 mode="outlined"
                 style={styles.input}
                 error={!!errors.email}
-                activeOutlineColor={theme.colors.primary}
+                left={<TextInput.Icon icon="email" />}
               />
             )}
             name="email"
           />
           {errors.email && (
-            <Text style={[styles.errorText, { color: theme.colors.error }]}>
+            <Text style={[styles.fieldError, { color: theme.colors.error }]}>
               {errors.email.message}
             </Text>
           )}
@@ -184,8 +174,12 @@ export default function SignupScreen() {
             rules={{
               required: 'Password is required',
               minLength: {
-                value: 6,
-                message: 'Password must be at least 6 characters',
+                value: 8,
+                message: 'Password must be at least 8 characters',
+              },
+              pattern: {
+                value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+                message: 'Password must contain uppercase, lowercase, number and special character',
               },
             }}
             render={({ field: { onChange, onBlur, value } }) => (
@@ -198,13 +192,13 @@ export default function SignupScreen() {
                 mode="outlined"
                 style={styles.input}
                 error={!!errors.password}
-                activeOutlineColor={theme.colors.primary}
+                left={<TextInput.Icon icon="lock" />}
               />
             )}
             name="password"
           />
           {errors.password && (
-            <Text style={[styles.errorText, { color: theme.colors.error }]}>
+            <Text style={[styles.fieldError, { color: theme.colors.error }]}>
               {errors.password.message}
             </Text>
           )}
@@ -212,7 +206,7 @@ export default function SignupScreen() {
           <Controller
             control={control}
             rules={{
-              required: 'Confirm Password is required',
+              required: 'Please confirm your password',
               validate: value => value === password || 'Passwords do not match',
             }}
             render={({ field: { onChange, onBlur, value } }) => (
@@ -225,13 +219,13 @@ export default function SignupScreen() {
                 mode="outlined"
                 style={styles.input}
                 error={!!errors.confirmPassword}
-                activeOutlineColor={theme.colors.primary}
+                left={<TextInput.Icon icon="lock-check" />}
               />
             )}
             name="confirmPassword"
           />
           {errors.confirmPassword && (
-            <Text style={[styles.errorText, { color: theme.colors.error }]}>
+            <Text style={[styles.fieldError, { color: theme.colors.error }]}>
               {errors.confirmPassword.message}
             </Text>
           )}
@@ -241,16 +235,16 @@ export default function SignupScreen() {
             onPress={handleSubmit(onSubmit)}
             loading={isLoading}
             disabled={isLoading}
-            style={styles.button}
-            contentStyle={{ paddingVertical: 10 }}
+            style={[styles.button, { backgroundColor: theme.colors.primary }]}
+            contentStyle={styles.buttonContent}
           >
-            Sign Up
+            Create Account
           </Button>
 
           <View style={styles.divider}>
-            <View style={[styles.dividerLine, { backgroundColor: theme.colors.placeholder }]} />
-            <Text style={[styles.dividerText, { color: theme.colors.placeholder }]}>or</Text>
-            <View style={[styles.dividerLine, { backgroundColor: theme.colors.placeholder }]} />
+            <View style={[styles.dividerLine, { backgroundColor: theme.colors.outline }]} />
+            <Text style={[styles.dividerText, { color: theme.colors.outline }]}>or</Text>
+            <View style={[styles.dividerLine, { backgroundColor: theme.colors.outline }]} />
           </View>
 
           <Button
@@ -258,17 +252,19 @@ export default function SignupScreen() {
             onPress={handleGoogleSignUp}
             loading={isLoading}
             disabled={isLoading}
+            icon="google"
             style={styles.googleButton}
             contentStyle={styles.buttonContent}
-            icon="google"
-            textColor={theme.colors.primary}
           >
             Sign up with Google
           </Button>
-        </View>
+        </Animated.View>
 
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.colors.text }]}>
+        <Animated.View 
+          entering={FadeInUp.delay(600).duration(1000)}
+          style={styles.footer}
+        >
+          <Text style={[styles.footerText, { color: theme.colors.outline }]}>
             Already have an account?
           </Text>
           <TouchableOpacity onPress={goToLogin}>
@@ -276,7 +272,7 @@ export default function SignupScreen() {
               Sign In
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </ScrollView>
     </AlertNotificationRoot>
   );
@@ -284,33 +280,60 @@ export default function SignupScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  contentContainer: {
     flexGrow: 1,
     padding: 24,
-    justifyContent: 'center',
+    paddingTop: Platform.OS === 'web' ? 40 : 60,
   },
   header: {
-    marginBottom: 40,
+    marginBottom: 32,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontFamily: 'Inter-Bold',
     marginBottom: 8,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    opacity: 0.6,
+    fontSize: 18,
     fontFamily: 'Inter-Regular',
+    opacity: 0.7,
+    textAlign: 'center',
+  },
+  errorContainer: {
+    backgroundColor: '#FFE5E5',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
   },
   form: {
     marginBottom: 24,
   },
   input: {
-    marginBottom: 16,
+    marginBottom: 8,
     backgroundColor: 'transparent',
   },
+  fieldError: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 12,
+    marginTop: -4,
+    marginLeft: 8,
+  },
   button: {
+    marginTop: 16,
     borderRadius: 8,
-    marginTop: 8,
+  },
+  buttonContent: {
+    paddingVertical: 8,
   },
   divider: {
     flexDirection: 'row',
@@ -329,28 +352,21 @@ const styles = StyleSheet.create({
   },
   googleButton: {
     borderRadius: 8,
-    borderColor: '#4285F4',
-  },
-  buttonContent: {
-    paddingVertical: 8,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 'auto',
+    paddingVertical: 16,
   },
   footerText: {
-    marginRight: 4,
-    fontFamily: 'Inter-Regular',
-  },
-  footerLink: {
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-  },
-  errorText: {
-    marginBottom: 12,
-    marginTop: -8,
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+    marginRight: 4,
+  },
+  footerLink: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
   },
 });
